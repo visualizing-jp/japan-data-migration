@@ -1,5 +1,6 @@
 /**
  * 地域ビュー。都道府県 × 転入超過（転入・転出）。
+ * 左: 指標切替 + 県ランキング / 右: タイル地図（housing・death と同型）。
  */
 
 import { use, useMemo, useState } from "react";
@@ -72,8 +73,64 @@ export function GeoView() {
   const pinnedTile = pinned === null ? undefined : tiles.find((t) => t.code === pinned);
 
   return (
-    <div className="mx-auto w-full max-w-[1240px] px-6 py-6">
-      <main className="min-w-0">
+    <div className="mx-auto flex w-full max-w-[1240px] gap-8 px-6 py-6 max-lg:flex-col-reverse">
+      <aside className="w-[300px] shrink-0 max-lg:w-full lg:sticky lg:top-6 lg:flex lg:max-h-[calc(100dvh-3rem)] lg:flex-col lg:self-start">
+        <div className="px-2 pb-3">
+          <Segmented options={options} value={metric} onChange={setMetric} label="指標" />
+        </div>
+        <h2 className="flex items-baseline justify-between px-2 pb-1 text-[11px] font-semibold tracking-wide text-faint">
+          <span>
+            都道府県 <span className="font-normal">{ranked.length}</span>
+          </span>
+          <span className="font-normal">{year}年</span>
+        </h2>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <ol className="flex flex-col">
+            {ranked.map((row, i) => {
+              const selected = row.code === pinned;
+              const active = row.code === focusCode;
+              return (
+                <li key={row.code}>
+                  <button
+                    type="button"
+                    onClick={() => setArea(selected ? "" : row.code)}
+                    onMouseEnter={() => setHovered(row.code)}
+                    onMouseLeave={() => setHovered(null)}
+                    aria-pressed={selected}
+                    className={`flex w-full cursor-pointer items-center gap-2 rounded px-2 py-[3px] text-left transition-colors duration-150 ${
+                      selected || active ? "bg-ink/[0.06]" : "hover:bg-ink/[0.03]"
+                    }`}
+                  >
+                    <span className="tnum w-4 shrink-0 text-right text-[11px] text-faint">
+                      {i + 1}
+                    </span>
+                    <span
+                      className={`min-w-0 flex-1 truncate text-[12px] ${
+                        selected ? "font-semibold text-ink" : "text-muted"
+                      }`}
+                      title={row.label}
+                    >
+                      {row.label}
+                    </span>
+                    <span
+                      className={`tnum shrink-0 text-right text-[11px] ${
+                        selected ? "text-ink" : "text-faint"
+                      }`}
+                    >
+                      {formatPeople(row.value)}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+        <p className="mt-2 border-t border-rule px-2 pt-2 text-[10.5px] leading-relaxed text-faint">
+          多い順。升や一覧をクリックすると県を固定する。
+        </p>
+      </aside>
+
+      <main className="min-w-0 flex-1">
         <header className="flex flex-wrap items-baseline justify-between gap-3 pb-4">
           <div className="flex min-w-0 flex-wrap items-baseline gap-3">
             <h1 className="truncate text-[19px] font-semibold tracking-tight">
@@ -81,10 +138,7 @@ export function GeoView() {
             </h1>
             <p className="tnum shrink-0 text-[13px] text-muted">{year}年</p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Segmented options={options} value={metric} onChange={setMetric} label="指標" />
-            <YearSelect years={years} value={year} onChange={setYear} />
-          </div>
+          <YearSelect years={years} value={year} onChange={setYear} />
         </header>
 
         <p className="tnum min-h-9 pb-4 text-[12.5px]">
@@ -95,11 +149,11 @@ export function GeoView() {
             </>
           ) : ranked.length >= 2 ? (
             <span className="text-muted">
-              最も転入超過が大きい{" "}
+              最も大きい{" "}
               <span className="font-semibold text-ink">
                 {ranked[0]!.label} {formatPeople(ranked[0]!.value)}
               </span>
-              {"  ／  最も転出超過が大きい "}
+              {"  ／  最も小さい "}
               <span className="font-semibold text-ink">
                 {ranked.at(-1)!.label} {formatPeople(ranked.at(-1)!.value)}
               </span>

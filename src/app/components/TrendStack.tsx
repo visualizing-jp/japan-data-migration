@@ -78,6 +78,17 @@ function niceMax(value: number): number {
   return 10 * mag;
 }
 
+/** パネル内の値から y 域を決める。負値があれば 0 を中央に置く。 */
+function yDomain(values: number[]): [number, number] {
+  const lo = Math.min(0, ...values);
+  const hi = Math.max(0, ...values);
+  if (lo < 0) {
+    const abs = niceMax(Math.max(-lo, hi));
+    return [-abs, abs];
+  }
+  return [0, niceMax(hi)];
+}
+
 function splitProjected(
   points: Point[],
   projectedFrom: number | undefined,
@@ -151,16 +162,14 @@ export function TrendStack({
       {panels.map((panel, pi) => {
         const top = pi * (HEADER_H + PLOT_H + GAP);
         const plotTop = top + HEADER_H;
-        const max = niceMax(
-          Math.max(
-            ...panel.series.flatMap((s) =>
-              s.points.map((p) => (p.value === null ? 0 : p.value)),
-            ),
-            0,
-          ),
+        const observed = panel.series.flatMap((s) =>
+          s.points.flatMap((p) => (p.value === null ? [] : [p.value])),
         );
-        const y = scaleLinear().domain([0, max]).range([plotTop + PLOT_H, plotTop]);
+        const [yMin, yMax] = yDomain(observed.length > 0 ? observed : [0]);
+        const y = scaleLinear().domain([yMin, yMax]).range([plotTop + PLOT_H, plotTop]);
         const pathD = (points: Point[]) => seriesPathD(points, (year) => x(year), (v) => y(v));
+        const ticks =
+          yMin < 0 ? [yMin, yMin / 2, 0, yMax / 2, yMax] : [0, yMax / 2, yMax];
 
         const readYear = hoverYear;
         const readout = panel.series
@@ -197,14 +206,14 @@ export function TrendStack({
               ))}
             </text>
 
-            {[0, max / 2, max].map((v) => (
+            {ticks.map((v) => (
               <g key={v}>
                 <line
                   x1={M.left}
                   x2={width - M.right}
                   y1={y(v)}
                   y2={y(v)}
-                  className="stroke-rule"
+                  className={v === 0 && yMin < 0 ? "stroke-rule-strong" : "stroke-rule"}
                   strokeWidth={1}
                 />
                 <text

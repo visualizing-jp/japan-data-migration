@@ -25,76 +25,83 @@ interface EraFile extends CubeJson {
   metrics: DictEntry[];
 }
 
-interface FormFile extends CubeJson {
-  formDims: DictEntry[];
-  codes: DictEntry[];
-}
-
 interface GeoFile extends CubeJson {
   metrics: DictEntry[];
   areas: DictEntry[];
 }
 
 const eraRaw = JSON.parse(await readFile(resolve(DATA, "era.json"), "utf8")) as EraFile;
-const formRaw = JSON.parse(await readFile(resolve(DATA, "form.json"), "utf8")) as FormFile;
 const geoRaw = JSON.parse(await readFile(resolve(DATA, "geo.json"), "utf8")) as GeoFile;
 
 const era = new CubeView(eraRaw);
-const form = new CubeView(formRaw);
 const geo = new CubeView(geoRaw);
 
-const total2023 = era.at("dwellings", { metric: "total", year: "2023" });
+const movers1954 = era.at("people", { metric: "movers", year: "1954" });
 ok(
-  "era 2023 総住宅数が妥当",
-  total2023 !== null && total2023 > 60_000_000 && total2023 < 70_000_000,
-  String(total2023),
+  "era 1954 移動者数が妥当",
+  movers1954 !== null && movers1954 > 4_000_000 && movers1954 < 7_000_000,
+  String(movers1954),
 );
 
-const vacantRate2023 = era.at("rate", { metric: "vacant", year: "2023" });
+const movers2019 = era.at("people", { metric: "movers", year: "2019" });
 ok(
-  "era 2023 空き家率≈13.8%",
-  vacantRate2023 !== null && near(vacantRate2023, 0.138, 0.005),
-  String(vacantRate2023),
+  "era 2019 移動者数≈488万（日本人）",
+  movers2019 !== null && near(movers2019, 4_889_191, 1),
+  String(movers2019),
 );
 
-const ownedRate2023 = era.at("rate", { metric: "owned", year: "2023" });
+const tokyo1987 = era.at("people", { metric: "tokyo_net", year: "1987" });
 ok(
-  "era 2023 持ち家比率≈60.9%",
-  ownedRate2023 !== null && near(ownedRate2023, 0.609, 0.01),
-  String(ownedRate2023),
+  "era 1987 東京圏転入超過≈16.4万",
+  tokyo1987 !== null && near(tokyo1987, 163_644, 1),
+  String(tokyo1987),
 );
 
-const vacant1978 = era.at("rate", { metric: "vacant", year: "1978" });
+const tokyo2011 = era.at("people", { metric: "tokyo_net", year: "2011" });
+const tokyo2019 = era.at("people", { metric: "tokyo_net", year: "2019" });
 ok(
-  "era 空き家率が上昇 (1978→2023)",
-  vacant1978 !== null && vacantRate2023 !== null && vacantRate2023 > vacant1978,
-  `${vacant1978} → ${vacantRate2023}`,
+  "era 東京圏転入超過が震災年に相対的に小さい",
+  tokyo2011 !== null && tokyo2019 !== null && tokyo2011 < tokyo2019,
+  `${tokyo2011} < ${tokyo2019}`,
 );
 
-const tenureSum = ["owned", "rented_public", "rented_private", "rented_issued"].reduce(
-  (n, code) => n + (form.at("share", { dim: "tenure", code, year: "2023" }) ?? 0),
-  0,
+const tokyo2020 = era.at("people", { metric: "tokyo_net", year: "2020" });
+ok(
+  "era 2020 東京圏転入超過が取得できている",
+  tokyo2020 !== null,
+  String(tokyo2020),
 );
-ok("form 2023 所有 share 合計≈1", near(tenureSum, 1, 0.05), String(tenureSum));
 
-const vacantShareSum = ["secondary", "for_rent", "for_sale", "other_vacant"].reduce(
-  (n, code) => n + (form.at("share", { dim: "vacancy", code, year: "2023" }) ?? 0),
-  0,
+const intra = era.at("people", { metric: "intra", year: "2019" });
+const inter = era.at("people", { metric: "inter", year: "2019" });
+ok(
+  "era 2019 県内+県間≈移動者数",
+  movers2019 !== null &&
+    intra !== null &&
+    inter !== null &&
+    near(intra + inter, movers2019, 2),
+  `${intra}+${inter}=${(intra ?? 0) + (inter ?? 0)} vs ${movers2019}`,
 );
-ok("form 2023 空き家種類 share 合計≈1", near(vacantShareSum, 1, 0.05), String(vacantShareSum));
 
 ok("geo 都道府県が47+全国", geoRaw.areas.length === 48, String(geoRaw.areas.length));
 
-const tokyoVacant = geo.at("value", { metric: "vacant", year: "2023", area: "13000" });
-const nationalVacant = geo.at("value", { metric: "vacant", year: "2023", area: "00000" });
+const tokyoNet2023 = geo.at("value", { metric: "net", year: "2023", area: "13000" });
+const aomoriNet2023 = geo.at("value", { metric: "net", year: "2023", area: "02000" });
 ok(
-  "geo 東京の空き家率が全国と異なる",
-  tokyoVacant !== null && nationalVacant !== null && tokyoVacant !== nationalVacant,
-  `東京 ${tokyoVacant} / 全国 ${nationalVacant}`,
+  "geo 2023 東京は転入超過、青森は転出超過寄り",
+  tokyoNet2023 !== null &&
+    aomoriNet2023 !== null &&
+    tokyoNet2023 > 0 &&
+    aomoriNet2023 < 0,
+  `東京 ${tokyoNet2023} / 青森 ${aomoriNet2023}`,
 );
 
-const relNat = geo.at("relative", { metric: "vacant", year: "2023", area: "00000" });
-ok("geo 全国 relative=1", relNat === 1, String(relNat));
+const natNet = geo.at("value", { metric: "net", year: "2023", area: "00000" });
+ok(
+  "geo 全国の転入超過は小さい（国内閉じ）",
+  natNet !== null && Math.abs(natNet) < 5_000,
+  String(natNet),
+);
 
 if (failed > 0) {
   console.error(`\n${failed} checks failed`);

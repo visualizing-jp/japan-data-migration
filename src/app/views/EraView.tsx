@@ -1,5 +1,5 @@
 /**
- * 時代ビュー。住宅ストックの件数・率・構成比の長期推移。
+ * 時代ビュー。国内移動と三大都市圏の長期推移。
  */
 
 import { use, useMemo, useState } from "react";
@@ -10,32 +10,37 @@ import { TypeList } from "../components/TypeList.tsx";
 import { TrendStack, type Panel, type Point } from "../components/TrendStack.tsx";
 import { useWidth } from "../hooks/useWidth.ts";
 import { useUrlState } from "../hooks/useUrlState.ts";
-
-const FROM = 1978;
-const TO = 2023;
+import { ERA_FROM, ERA_TO } from "../../lib/data/labels.ts";
 
 const int = new Intl.NumberFormat("ja-JP");
-const pct = new Intl.NumberFormat("ja-JP", {
-  minimumFractionDigits: 1,
-  maximumFractionDigits: 1,
-});
-const areaFmt = new Intl.NumberFormat("ja-JP", {
-  minimumFractionDigits: 1,
-  maximumFractionDigits: 1,
-});
 
 function dense(years: number[], values: (number | null)[]): Point[] {
   const byYear = new Map(years.map((y, i) => [y, values[i] ?? null]));
-  return Array.from({ length: TO - FROM + 1 }, (_, i) => ({
-    year: FROM + i,
-    value: byYear.get(FROM + i) ?? null,
+  return Array.from({ length: ERA_TO - ERA_FROM + 1 }, (_, i) => ({
+    year: ERA_FROM + i,
+    value: byYear.get(ERA_FROM + i) ?? null,
   }));
+}
+
+function formatPeople(v: number): string {
+  const abs = Math.abs(v);
+  const sign = v < 0 ? "−" : "";
+  if (abs >= 10_000) return `${sign}${int.format(Math.round(abs / 10_000))}万人`;
+  return `${sign}${int.format(Math.round(abs))}人`;
+}
+
+function formatTick(v: number): string {
+  const abs = Math.abs(v);
+  const sign = v < 0 ? "−" : "";
+  if (abs >= 10_000) return `${sign}${int.format(Math.round(abs / 10_000))}万`;
+  return `${sign}${int.format(Math.round(abs))}`;
 }
 
 export function EraView() {
   const { metrics, cube, years } = use(loadEra());
   const selectable = useMemo(() => listMetrics(metrics), [metrics]);
-  const defaultMetric = selectable.find((m) => m.code === "vacant")?.code ?? selectable[0]!.code;
+  const defaultMetric =
+    selectable.find((m) => m.code === "tokyo_net")?.code ?? selectable[0]!.code;
 
   const [metric, setMetric] = useUrlState<string>("metric", defaultMetric, (v) =>
     selectable.some((c) => c.code === v),
@@ -44,108 +49,38 @@ export function EraView() {
   const [ref, width] = useWidth<HTMLDivElement>();
 
   const current = selectable.find((c) => c.code === metric)!;
-  const isArea = metric === "floor_area";
 
   const rows = useMemo(
     () =>
       selectable.map((c) => ({
         type: c,
-        values:
-          c.code === "floor_area"
-            ? cube.series("rate", "year", { metric: c.code })
-            : cube.series("rate", "year", { metric: c.code }).some((v) => v !== null)
-              ? cube.series("rate", "year", { metric: c.code })
-              : cube.series("share", "year", { metric: c.code }),
+        values: cube.series("people", "year", { metric: c.code }),
       })),
     [selectable, cube],
   );
 
   const panels = useMemo((): Panel[] => {
-    const at = (measure: string) => cube.series(measure, "year", { metric });
-
-    if (isArea) {
-      return [
-        {
-          key: "area",
-          title: "1住宅当たり延べ面積",
-          unit: "㎡",
-          format: (v) => `${areaFmt.format(v)}㎡`,
-          formatTick: (v) => areaFmt.format(v),
-          series: [
-            {
-              key: "area",
-              label: "",
-              points: dense(years, at("rate")),
-              emphasized: true,
-              markSparseSamples: true,
-            },
-          ],
-        },
-      ];
-    }
-
-    const panels: Panel[] = [
+    const at = cube.series("people", "year", { metric });
+    const signed = metric.endsWith("_net");
+    return [
       {
-        key: "dwellings",
-        title: "住宅数",
-        unit: "戸",
-        format: (v) => int.format(Math.round(v)),
-        formatTick: (v) =>
-          v >= 1_000_000 ? `${int.format(Math.round(v / 10_000))}万` : int.format(v),
+        key: "people",
+        title: current.label,
+        unit: "人",
+        format: formatPeople,
+        formatTick,
         series: [
           {
-            key: "dwellings",
+            key: "people",
             label: "",
-            points: dense(years, at("dwellings")),
+            points: dense(years, at),
             emphasized: true,
-            markSparseSamples: true,
           },
         ],
+        coverage: signed ? "転入超過は正、転出超過は負" : undefined,
       },
     ];
-
-    const rates = at("rate");
-    if (rates.some((v) => v !== null)) {
-      panels.push({
-        key: "rate",
-        title: "率",
-        unit:
-          metric === "vacant"
-            ? "総住宅数に占める割合"
-            : "居住世帯あり住宅に占める割合",
-        format: (v) => `${pct.format(v * 100)}%`,
-        formatTick: (v) => `${pct.format(v * 100)}%`,
-        series: [
-          {
-            key: "rate",
-            label: "",
-            points: dense(years, rates),
-            emphasized: true,
-            markSparseSamples: true,
-          },
-        ],
-      });
-    } else {
-      panels.push({
-        key: "share",
-        title: "構成比",
-        unit: "分母に占める割合",
-        format: (v) => `${pct.format(v * 100)}%`,
-        formatTick: (v) => `${pct.format(v * 100)}%`,
-        series: [
-          {
-            key: "share",
-            label: "",
-            points: dense(years, at("share")),
-            emphasized: true,
-            markSparseSamples: true,
-          },
-        ],
-      });
-    }
-
-    return panels;
-  }, [cube, metric, years, isArea]);
+  }, [cube, metric, years, current.label]);
 
   return (
     <div className="mx-auto flex w-full max-w-[1240px] gap-8 px-6 py-6 max-lg:flex-col-reverse">
@@ -157,7 +92,7 @@ export function EraView() {
           <TypeList rows={rows} years={years} selected={metric} onSelect={setMetric} />
         </div>
         <p className="px-2 pt-3 text-[10.5px] leading-relaxed text-faint">
-          折れ線は率（または構成比）の推移。高さは項目ごとに正規化してある。
+          1954年以降の日本人移動者。東京圏の転入超過が物語の主線。
         </p>
       </aside>
 
@@ -168,16 +103,16 @@ export function EraView() {
             <p
               className={`tnum text-[13px] ${hoverYear === null ? "text-faint" : "text-ink"}`}
             >
-              {hoverYear ?? TO}年
+              {hoverYear ?? ERA_TO}年
             </p>
           </div>
         </header>
 
-        <div ref={ref} className="min-h-[420px]">
+        <div ref={ref} className="min-h-[280px]">
           {width > 0 && (
             <TrendStack
               panels={panels}
-              domain={[FROM, TO]}
+              domain={[ERA_FROM, ERA_TO]}
               width={width}
               hoverYear={hoverYear}
               onHoverYear={setHoverYear}

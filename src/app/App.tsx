@@ -1,9 +1,13 @@
+import { Suspense } from "react";
+import { EraView } from "./views/EraView.tsx";
+import { GeoView } from "./views/GeoView.tsx";
+import { EventsView } from "./views/EventsView.tsx";
 import { useUrlState } from "./hooks/useUrlState.ts";
 
 const VIEWS = [
-  { id: "era", label: "時代", hint: "長期推移", ready: true },
+  { id: "era", label: "時代", hint: "1954–2025", ready: true },
   { id: "geo", label: "地域", hint: "転入超過", ready: true },
-  { id: "events", label: "出来事", hint: "イベント注記", ready: true },
+  { id: "events", label: "出来事", hint: "バブル・震災・コロナ", ready: true },
 ] as const;
 
 type ViewId = (typeof VIEWS)[number]["id"];
@@ -22,7 +26,7 @@ export function App() {
               日本人はどこへ移り住んできたか
             </h1>
             <p className="text-[11px] text-muted">
-              住民基本台帳人口移動報告
+              総務省「住民基本台帳人口移動報告」
             </p>
           </div>
           <nav className="flex gap-1 -mb-px" aria-label="ビュー">
@@ -49,16 +53,15 @@ export function App() {
         </div>
       </header>
 
-<main className="mx-auto w-full max-w-[1240px] px-6 py-16">
-  <p className="text-[13px] text-ink">「日本人はどこへ移り住んできたか」のビュー実装は Phase 2 で進めます。</p>
-  <p className="mt-2 text-[12px] text-muted">
-    いまは骨格のみ。主な統計は「住民基本台帳人口移動報告」。可視化の核: 東京一極集中、地方→都市、バブル・震災・コロナによる人口移動
-  </p>
-  <p className="mt-4 text-[11px] text-faint">選択中のタブ: {view}</p>
-</main>
+      <Suspense key={view} fallback={<Loading />}>
+        {view === "era" && <EraView />}
+        {view === "geo" && <GeoView />}
+        {view === "events" && <EventsView />}
+      </Suspense>
 
       <footer className="mx-auto w-full max-w-[1240px] px-6 pt-2 pb-10 text-[11px] leading-relaxed text-faint">
-        出典: 住民基本台帳人口移動報告（詳細は docs/data-sources.md。表IDは調査後に確定）。
+        出典: 総務省「住民基本台帳人口移動報告」（e-Stat）。表示は日本人移動者。
+        東京圏＝埼玉・千葉・東京・神奈川。名古屋圏＝岐阜・愛知・三重。大阪圏＝京都・大阪・兵庫・奈良。
         <a
           href="https://visualizing.jp/"
           className="mt-2 block w-fit transition-colors duration-150 hover:text-muted"
@@ -66,6 +69,14 @@ export function App() {
           visualizing.jp
         </a>
       </footer>
+    </div>
+  );
+}
+
+function Loading() {
+  return (
+    <div className="mx-auto w-full max-w-[1240px] px-6 py-16 text-[12px] text-faint">
+      読み込み中
     </div>
   );
 }

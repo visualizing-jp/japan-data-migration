@@ -1,6 +1,7 @@
 /**
  * 家族類型の一覧。項目ごとにスパークラインを添えて、選ぶ前に形が見えるようにする。
  * 高さは行ごとに正規化するので、項目間の大小は比べられない。
+ * 転入超過のように負値がある系列は 0 を中央に置く。
  */
 
 import { line } from "d3-shape";
@@ -33,13 +34,19 @@ export function TypeList({
   return (
     <ul className="flex flex-col">
       {rows.map(({ type, values }) => {
-        const max = Math.max(...values.map((v) => v ?? 0), 0);
-        const y = scaleLinear().domain([0, max || 1]).range([H - 2, 2]);
+        const nums = values.filter((v): v is number => v !== null);
+        const lo = Math.min(0, ...nums, 0);
+        const hi = Math.max(0, ...nums, 0);
+        const pad = lo < 0 ? Math.max(-lo, hi) || 1 : hi || 1;
+        const y = scaleLinear()
+          .domain(lo < 0 ? [-pad, pad] : [0, pad])
+          .range([H - 2, 2]);
         const path = line<number | null>()
           .defined((v) => v !== null)
           .x((_, i) => x(years[i]!))
           .y((v) => y(v!));
         const isSelected = type.code === selected;
+        const zeroY = lo < 0 ? y(0) : null;
 
         return (
           <li key={type.code}>
@@ -60,6 +67,16 @@ export function TypeList({
                 {type.label}
               </span>
               <svg width={W} height={H} className="shrink-0" aria-hidden>
+                {zeroY !== null && (
+                  <line
+                    x1={1}
+                    x2={W - 1}
+                    y1={zeroY}
+                    y2={zeroY}
+                    className="stroke-rule"
+                    strokeWidth={1}
+                  />
+                )}
                 <path
                   d={path(values) ?? undefined}
                   fill="none"

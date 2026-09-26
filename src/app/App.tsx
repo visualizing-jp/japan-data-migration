@@ -3,6 +3,7 @@ import { EraView } from "./views/EraView.tsx";
 import { GeoView } from "./views/GeoView.tsx";
 import { EventsView } from "./views/EventsView.tsx";
 import { useUrlState } from "./hooks/useUrlState.ts";
+import { SeriesBar, SeriesFooter } from "./components/Brand.tsx";
 
 const VIEWS = [
   { id: "era", label: "時代", hint: "1954–2025", ready: true },
@@ -20,6 +21,7 @@ export function App() {
   return (
     <div className="min-h-dvh">
       <header className="border-b border-rule bg-paper/85 backdrop-blur-sm">
+        <SeriesBar />
         <div className="mx-auto flex w-full max-w-[1240px] flex-wrap items-end justify-between gap-4 px-6 pt-5">
           <div>
             <h1 className="text-[15px] font-semibold tracking-tight">
@@ -62,12 +64,7 @@ export function App() {
       <footer className="mx-auto w-full max-w-[1240px] px-6 pt-2 pb-10 text-[11px] leading-relaxed text-faint">
         出典: 総務省「住民基本台帳人口移動報告」（e-Stat）。表示は日本人移動者。
         東京圏＝埼玉・千葉・東京・神奈川。名古屋圏＝岐阜・愛知・三重。大阪圏＝京都・大阪・兵庫・奈良。
-        <a
-          href="https://visualizing.jp/"
-          className="mt-2 block w-fit transition-colors duration-150 hover:text-muted"
-        >
-          visualizing.jp
-        </a>
+        <SeriesFooter />
       </footer>
     </div>
   );
